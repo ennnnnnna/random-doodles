@@ -1,8 +1,6 @@
 {
-  "name": "Remix: Smart Meeting Logger",
+  "name": "Smart Meeting Logger",
   "description": "An AI-powered meeting analysis and archive web app that refines transcripts, maps questions, and generates actionable summaries.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

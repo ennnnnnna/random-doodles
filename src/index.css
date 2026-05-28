@@ -1,1 +1,85 @@
 @import "tailwindcss";
+
+/* ── Custom palette from uploaded image ──────────────────────────────────────
+   Blue    #4B6BFB  →  primary / CTA
+   Purple  #7C3AED  →  accent / phase markers
+   Pink    #D946A8  →  Q&A / highlights
+   Red     #F43F5E  →  warnings / unresolved
+   Orange  #F97316  →  action items
+   Yellow  #EAB308  →  tags / keywords
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --c-blue:   #4B6BFB;
+  --c-purple: #7C3AED;
+  --c-pink:   #D946A8;
+  --c-red:    #F43F5E;
+  --c-orange: #F97316;
+  --c-yellow: #EAB308;
+
+  --c-blue-soft:   #EEF2FF;
+  --c-purple-soft: #F5F3FF;
+  --c-pink-soft:   #FDF2F8;
+  --c-orange-soft: #FFF7ED;
+  --c-yellow-soft: #FEFCE8;
+
+  --c-ink:    #1E1F2E;
+  --c-ink2:   #374151;
+  --c-muted:  #6B7280;
+  --c-border: #E5E7EB;
+  --c-bg:     #F8F9FC;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Typography scale ────────────────────────────────────────────────────── */
+.text-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.text-body    { font-size: 14px; line-height: 1.65; color: var(--c-ink2); }
+.text-body-lg { font-size: 15px; line-height: 1.7;  color: var(--c-ink2); }
+.text-caption { font-size: 12px; color: var(--c-muted); }
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 99px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+
+/* ── Chip / Tag ──────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip-blue   { background: var(--c-blue-soft);   color: var(--c-blue);   border-color: #C7D7FD; }
+.chip-purple { background: var(--c-purple-soft); color: var(--c-purple); border-color: #DDD6FE; }
+.chip-yellow { background: var(--c-yellow-soft); color: #92400E;         border-color: #FDE68A; }
+.chip-orange { background: var(--c-orange-soft); color: var(--c-orange); border-color: #FED7AA; }
+.chip-pink   { background: var(--c-pink-soft);   color: var(--c-pink);   border-color: #FBCFE8; }
+.chip-slate  { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+
+.chip:hover  { filter: brightness(0.95); }
+.chip.active { filter: brightness(0.92); font-weight: 700; }
