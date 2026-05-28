@@ -1,23 +1,23 @@
-export interface Speaker {
-  id: string; // e.g., "참석자1"
-  name: string; // e.g., "연구원장", "홍길동"
-}
+// ─────────────────────────────────────────────
+// v2-ready data structures
+// ─────────────────────────────────────────────
 
 export interface ActionItem {
   who: string;
   what: string;
   when: string;
+  status?: 'pending' | 'done'; // v2: tracking
 }
 
 export interface Citation {
   id: number;
-  text: string; // The quoted text or core point
+  text: string;
   speaker: string;
 }
 
 export interface SummaryItem {
   topic: string;
-  summary: string; // Summary with footnotes like [1], [2]
+  summary: string;
   citations: Citation[];
 }
 
@@ -35,9 +35,9 @@ export interface RefinedTranscriptLine {
 }
 
 export interface MeetingAnalysis {
-  topics: string[]; // 5 recommended topics
+  topics: string[];
   selectedTopics: string[];
-  excludedTopics?: string[]; // Topics that should not be recommended again
+  excludedTopics?: string[];
   summaryItems: SummaryItem[];
   questionMappings: QuestionMapping[];
   actionItems: ActionItem[];
@@ -45,15 +45,33 @@ export interface MeetingAnalysis {
 }
 
 export interface Meeting {
+  // identity
   id: string;
-  title: string; // User-defined or AI-generated title
-  date: string;
-  type: string;
-  keywords: string[];
+  title: string;
+  date: string;         // YYYY.MM.DD
+  type: string;         // 회의 종류 e.g. 간담회
+  keywords: string[];   // AI-suggested + manual tags
+
+  // input
   originalTranscript: string;
   glossary: string;
   prefixedQuestions: string;
-  speakerMap: Record<string, string>; // speakerId -> speakerName
+  speakerMap: Record<string, string>; // speakerId → displayName
+
+  // output
   analysis?: MeetingAnalysis;
-  updatedAt: string;
+
+  // meta
+  createdAt: string;    // ISO string
+  updatedAt: string;    // ISO string
+
+  // v2: sync marker (will be used when switching to Firebase)
+  syncedAt?: string;
+}
+
+// v2 placeholder — swap body for Firebase calls
+export interface StorageAdapter {
+  getAll: () => Promise<Meeting[]>;
+  save: (meeting: Meeting) => Promise<void>;
+  remove: (id: string) => Promise<void>;
 }
