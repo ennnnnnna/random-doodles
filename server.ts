@@ -3,6 +3,7 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+
 dotenv.config();
 
 const app = express();
@@ -12,35 +13,34 @@ app.use(express.json({ limit: '10mb' }));
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
 });
 
-// ── Phase 1: Analyze speakers, topics, AND keywords ──────────────────────────
+// Phase 1: Analyze speakers and topics
 app.post("/api/analyze-topics", async (req, res) => {
   try {
     const { transcript, excludedTopics = [] } = req.body;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `
-Analyze the following meeting transcript.
-
-1. **Speakers**: Identify all unique speakers.
-   Look for patterns like "[Name] [Time]" or "[Name]:" at the start of paragraphs.
-   Use real names if found (e.g., "홍길동"), otherwise "참석자 1", "참석자 2", etc.
-
-2. **Topics**: Recommend important core discussion topics for business/HR/collaboration domain.
-   Provide 5–10 highly relevant topics. ALL TOPICS MUST BE IN KOREAN.
-   DO NOT include any of these excluded topics: [${excludedTopics.join(", ")}].
-
-3. **Keywords**: Extract 5–8 concise keyword tags that best describe this meeting for archiving.
-   Think: what tags would help someone search for this meeting later?
-   Examples: 인사제도, 육아휴직, 조직개편, 성과평가, 복지개편
-   ALL KEYWORDS MUST BE IN KOREAN. Single words or short compound nouns only.
-
-Transcript:
-${transcript.substring(0, 20000)}
-`,
+        Analyze the following meeting transcript. 
+        1. Identify all unique speakers. Look for patterns like "[Name] [Time]" or "[Name]:" at the start of paragraphs. 
+           If clear names are found, use them (e.g., "홍길동"). If not, use "참석자 1", "참석자 2", etc.
+        2. Recommend important core discussion topics suitable for business/collaboration domain, based on actual key agendas discussed. Do not restrict it to exactly 5 topics. Provide a flexible number of highly relevant topics depending on the transcript content, but do not exceed 10 topics in total.
+        
+        **CRITICAL RULES:**
+        - ALL TOPICS MUST BE IN KOREAN (한국어).
+        - DO NOT include or suggest any of these excluded topics: [${excludedTopics.join(", ")}].
+        - Standardize and output up to 10 topics maximum.
+        
+        Transcript:
+        ${transcript.substring(0, 20000)}
+      `,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -49,20 +49,15 @@ ${transcript.substring(0, 20000)}
             speakers: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Detected speaker IDs or names"
+              description: "List of detected speaker IDs or names"
             },
             topics: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Recommended core topics in Korean"
-            },
-            keywords: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "Archive keyword tags in Korean, 5-8 items"
+              description: "Recommended core topics in Korean, up to 10 topics max based on meeting agendas"
             }
           },
-          required: ["speakers", "topics", "keywords"]
+          required: ["speakers", "topics"]
         }
       }
     });
@@ -74,33 +69,40 @@ ${transcript.substring(0, 20000)}
   }
 });
 
-// ── Phase 2: Refine transcript ────────────────────────────────────────────────
+// Phase 2: Final refinement
 app.post("/api/refine-transcript", async (req, res) => {
   try {
-    const { transcript, glossary, questions, selectedTopics, speakerMap, keywords } = req.body;
+    const { 
+      transcript, 
+      glossary, 
+      questions, 
+      selectedTopics, 
+      speakerMap 
+    } = req.body;
+
+    const speakerMapStr = JSON.stringify(speakerMap);
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `
-You are a professional secretary and HR assistant.
-Refine the following meeting transcript into a RICH report.
-
-**RULES:**
-1. **Refinement**: Convert colloquial speech to professional literary Korean. Group consecutive lines by the same speaker.
-2. **Glossary**: Correct terminology using: ${glossary}
-3. **Speaker Mapping**: Use mapped names: ${JSON.stringify(speakerMap)}.
-4. **Keywords context**: This meeting is tagged with [${(keywords || []).join(", ")}]. Use this context to better understand the domain.
-5. **RICH Summary & Citations**: For each topic in [${selectedTopics.join(", ")}]:
-   - Provide a DETAILED summary (3-5 sentences).
-   - Insert footnotes [1], [2] at relevant points.
-   - For each footnote, include the original speaker name and core gist.
-6. **Question Mapping**: Map these questions to transcript context: [${questions}]
-7. **Action Items**: Extract Who, What, When.
-8. **ALL OUTPUT MUST BE IN KOREAN.**
-
-Transcript:
-${transcript.substring(0, 15000)}
-`,
+        You are a professional secretary and HR assistant.
+        Refine the following meeting transcript into a RICH report.
+        
+        **RI RULES:**
+        1. **Refinement:** Convert colloquial speech to professional literary (written) style Korean. Group consecutive lines by the same speaker into one block.
+        2. **Glossary:** Correct terminology using: ${glossary}
+        3. **Speaker Mapping:** Use these mapped names: ${speakerMapStr}.
+        4. **RICH Summary & Citations:** For each topic in [${selectedTopics.join(", ")}]:
+           - Provide a DETAILED summary (3-5 sentences).
+           - Insert footnotes like [1], [2] at the end of relevant points.
+           - For each footnote, provide a citation object containing the original speaker name and the core gist of their statement.
+        5. **Question Mapping:** Map questions: [${questions}] to context.
+        6. **Action Items:** Extract Who, What, When.
+        7. **ALL OUTPUT MUST BE IN KOREAN.**
+        
+        Transcript:
+        ${transcript.substring(0, 15000)}
+      `,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -112,7 +114,7 @@ ${transcript.substring(0, 15000)}
                 type: Type.OBJECT,
                 properties: {
                   topic: { type: Type.STRING },
-                  summary: { type: Type.STRING },
+                  summary: { type: Type.STRING, description: "Detailed summary with [n] footnotes" },
                   citations: {
                     type: Type.ARRAY,
                     items: {
@@ -120,7 +122,7 @@ ${transcript.substring(0, 15000)}
                       properties: {
                         id: { type: Type.NUMBER },
                         speaker: { type: Type.STRING },
-                        text: { type: Type.STRING }
+                        text: { type: Type.STRING, description: "The core gist or quote from the transcript" }
                       },
                       required: ["id", "speaker", "text"]
                     }
@@ -177,91 +179,6 @@ ${transcript.substring(0, 15000)}
   }
 });
 
-// ── v2: Cross-analysis ────────────────────────────────────────────────────────
-app.post("/api/cross-analyze", async (req, res) => {
-  try {
-    const { meetings } = req.body;
-    // meetings: Array<{ title, date, type, keywords, analysis }>
-
-    const meetingSummaries = meetings.map((m: any, i: number) => `
-## 회의 ${i + 1}: ${m.title} (${m.date}, ${m.type})
-키워드: ${m.keywords?.join(', ')}
-주제별 요약:
-${m.analysis?.summaryItems?.map((s: any) => `- ${s.topic}: ${s.summary}`).join('\n')}
-액션아이템:
-${m.analysis?.actionItems?.map((a: any) => `- [${a.who}] ${a.what} (${a.when})`).join('\n')}
-`).join('\n---\n');
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `
-You are an expert HR and organizational analyst.
-Analyze the following ${meetings.length} meeting records and produce cross-meeting insights.
-
-${meetingSummaries}
-
-Produce:
-1. **actionItemTracking**: All action items across meetings, with meeting source and status inference.
-2. **topicTimeline**: How key topics evolved across meetings (earliest to latest mention, changes in stance).
-3. **unresolvedIssues**: Issues or concerns raised in multiple meetings without clear resolution.
-ALL OUTPUT MUST BE IN KOREAN.
-`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            actionItemTracking: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  who: { type: Type.STRING },
-                  what: { type: Type.STRING },
-                  when: { type: Type.STRING },
-                  source: { type: Type.STRING },
-                  status: { type: Type.STRING }
-                },
-                required: ["who", "what", "when", "source", "status"]
-              }
-            },
-            topicTimeline: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  topic: { type: Type.STRING },
-                  evolution: { type: Type.STRING }
-                },
-                required: ["topic", "evolution"]
-              }
-            },
-            unresolvedIssues: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  issue: { type: Type.STRING },
-                  appearedIn: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  summary: { type: Type.STRING }
-                },
-                required: ["issue", "appearedIn", "summary"]
-              }
-            }
-          },
-          required: ["actionItemTracking", "topicTimeline", "unresolvedIssues"]
-        }
-      }
-    });
-
-    res.json(JSON.parse(response.text || "{}"));
-  } catch (error: any) {
-    console.error("Cross-analysis error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ── Static / Vite ─────────────────────────────────────────────────────────────
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -272,10 +189,11 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
